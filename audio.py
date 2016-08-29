@@ -271,9 +271,8 @@ class Audio():
         sample = appsink.emit("pull-sample")
         buffer = sample.get_buffer()
         data = buffer.extract_dup(0, buffer.get_size())
-        if self.speaking_started:
-            self.audio_from_mic.put(data)
-            #self._log.info("Putting a sample into queue %s", self.audio_from_mic)
+        self.audio_from_mic.put(data)
+        #self._log.info("Putting a sample into queue %s", self.audio_from_mic)
         return Gst.FlowReturn.OK
     
     speaking_started = False
