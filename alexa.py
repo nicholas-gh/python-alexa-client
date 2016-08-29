@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-#from hyper.ssl_compat import SSLContext, SSLSocket
-from hyper.contrib import HTTP20Adapter
 from hyper.http20.response import HTTP20Response
-from requests_toolbelt import MultipartEncoder
 from shove import Shove
 import cgi
 import datetime
 import dateutil.parser
-import h2.connection
 import hyper
 import io
 import json
@@ -16,8 +12,6 @@ import logging.config
 import pprint
 import pytz
 import queue
-import requests
-import socket
 import threading
 import time
 import uuid
@@ -103,8 +97,7 @@ class Alexa():
 
     def eventQueueThread(self):
         conn = hyper.HTTP20Connection('avs-alexa-na.amazon.com:443',
-                                            enable_push=True,
-                                            force_proto="h2")
+                                      force_proto="h2")
         alexa_tokens = self.get_alexa_tokens()
         def handle_downstream():
             directives_stream_id = conn.request('GET',
@@ -160,14 +153,6 @@ class Alexa():
                 "event": event
             }
             self._log.debug("Sending to AVS: \n%s", pprint.pformat(metadata))
-            payload_list = [('metadata', (None, json.dumps(metadata), 'application/json; charset=UTF-8'))]
-            if attachment:
-                # in this case, it would be much better to handcraft the Multipart to be able to
-                # stream the response up. Handcrafting needed as we would have to omit length header
-                payload_list.append((attachment[0], (None, attachment[1], 'application/octet-stream')))
-
-            #m = MultipartEncoder(payload_list)
-            #print(m.to_string())
 
             boundary = uuid.uuid4().hex
             json_part = bytes(u'--{}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{}'.format(boundary, json.dumps(metadata).encode('utf-8')), 'utf-8')
@@ -687,7 +672,6 @@ class Alexa():
                     self._log.info("access_token should be OK, expires %s", expiry)                
                     return alexa_tokens
 
-
         payload = {'client_id': alexa_tokens['client_id'],
                    'client_secret': alexa_tokens['client_secret'],
                    'grant_type': 'refresh_token',
@@ -707,16 +691,6 @@ class Alexa():
         open(self._tokens_filename,'w').write(json.dumps(payload))
         return payload
         
-    def talk_button_pressed(self):
-        log.info("Alexa invoked")
-        player.set_state(Gst.State.PAUSED)    
-        speak("Listening")
-        time.sleep(1)
-        #aplay("/home/pi/kitchen-music/alexa-beep.wav", _bg=True)
-        log.info("Starting alexa microphone pipeline to PLAYING")
-        alsa_mic_pipeline.set_state(Gst.State.PLAYING)
-        alexapipeline.set_state(Gst.State.READY)
-
 if __name__ == "__main__":
     logging.config.dictConfig({
         'version': 1,
