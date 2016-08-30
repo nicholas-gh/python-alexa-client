@@ -136,6 +136,8 @@ class Alexa():
             except queue.Empty:
                 event = None
 
+            # TODO check that connection is still functioning and reestablish if needed
+
             while directives_stream.data or (conn._sock and conn._sock.can_read):
                 # we want to avoid blocking if the data wasn't for stream directives_stream
                 if conn._sock and conn._sock.can_read:
@@ -390,6 +392,8 @@ class Alexa():
                     first_payload_block = False
                 else:
                     payload.write(b"\r\n")
+                # TODO write this to a queue.Queue in self._content_cache[content_id]
+                # so that other threads can start to play it right away
                 payload.write(line)
 
         if buffer is not None:
@@ -401,6 +405,10 @@ class Alexa():
                 buffer.write(b"\r\n")
             
         for directive in directives:
+            # TODO do this when we get to the end of the JSON block
+            # rather than wait for the entire HTTP payload, so we can
+            # start acting on it right away - will require potential
+            # waiting on audio data
             self._handleDirective(directive)
 
     def PlaybackStartedCallback(self, pipeline, token):
@@ -466,6 +474,12 @@ class Alexa():
         self._audio.speech_pipeline.set_state(Gst.State.READY)
         token = detail['token']
         if detail['url'].startswith("cid:"):
+            # TODO expect _content_cache to contain a queue.Queue()
+            # pass the whole _content_cache into speechQueue (or have
+            # it be owned by _audio), so that the 'playing' thread can
+            # be the one who waits for the queue itself to arrive
+            # (maybe the directive was hit to play, and we get here,
+            # before we see a single line of audio data)
             contentfp = self._content_cache[detail['url'][4:]]
             buffer = Gst.Buffer.new_wrapped(contentfp.read())
             del self._content_cache[detail['url'][4:]]
@@ -479,6 +493,12 @@ class Alexa():
         offsetInMilliseconds = detail['stream']['offsetInMilliseconds']
         
         if url.startswith("cid:"):
+            # TODO expect _content_cache to contain a queue.Queue()
+            # pass the whole _content_cache into speechQueue (or have
+            # it be owned by _audio), so that the 'playing' thread can
+            # be the one who waits for the queue itself to arrive
+            # (maybe the directive was hit to play, and we get here,
+            # before we see a single line of audio data)
             self._log.info("Play audio from attachment {}".format(detail))
             contentfp = self._content_cache[url[4:]]
             buffer = Gst.Buffer.new_wrapped(contentfp.read())
